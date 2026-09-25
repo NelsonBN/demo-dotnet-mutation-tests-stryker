@@ -21,6 +21,13 @@ public static class ProductsEndpoints
         });
 
 
+        endpoints.MapGet("/products/low-stock", async (GetLowStockProductsUseCase userCase, CancellationToken cancellationToken, uint threshold = 10) =>
+        {
+            var products = await userCase.ExecuteAsync(threshold, cancellationToken);
+            return Results.Ok(products);
+        });
+
+
         endpoints.MapGet("/products/{id:guid}", async (GetProductUseCase userCase, Guid id, CancellationToken cancellationToken) =>
         {
             try
