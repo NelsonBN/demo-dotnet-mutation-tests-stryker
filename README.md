@@ -212,15 +212,15 @@ Neither gives a full report on a PR. Stryker's [`--with-baseline`](https://stryk
 
 ```mermaid
 flowchart TD
-    A["git diff --name-only --diff-filter=AMR origin/base...HEAD"] --> B{"changed file"}
-    B -->|"src/**/*.cs"| C["target: the file itself"]
-    B -->|"tests/**/*.cs"| D["test project = nearest folder with a .csproj"]
-    B -->|"anything else"| X["ignored"]
-    D --> E["src projects = its ProjectReference items under src/"]
+    A["git diff --name-only --diff-filter=AMR origin/base...HEAD -- '*.cs'"] --> P["project = nearest parent folder with a .csproj"]
+    P --> B{"project type"}
+    B -->|"no project"| X["ignored"]
+    B -->|"source project"| C["target: the file itself"]
+    B -->|"test project"| E["source projects = its non-test ProjectReference items"]
     E --> F["candidate names: file name without Tests/Test suffix, then parent folder names"]
-    F --> G{"type with that name declared in the src projects?"}
+    F --> G{"type with that name declared in the source projects?"}
     G -->|"yes"| H["target: file(s) declaring the type"]
-    G -->|"no candidate matches"| I["target: every .cs file of the referenced src projects"]
+    G -->|"no candidate matches"| I["target: every .cs file of the referenced source projects"]
     C --> J["deduplicate, one --mutate glob per line"]
     H --> J
     I --> J
@@ -229,16 +229,22 @@ flowchart TD
     K -->|"no"| M["skip Stryker"]
 ```
 
-Rules implemented by [.github/scripts/detect-mutation-targets.sh](.github/scripts/detect-mutation-targets.sh):
+Rules implemented by [.github/scripts/detect-mutation-targets.sh](.github/scripts/detect-mutation-targets.sh). They don't depend on the folder layout: `src/` + `tests/` (this repository) and flat layouts with every project at the repository root (`Payments.Core`, `Payments.Core.Tests`, ...) both work.
 
-- Only added, modified and renamed files are considered (`--diff-filter=AMR`). Deleted files have nothing left to mutate.
-- `src/**/*.cs`: the file itself becomes the target `**/<path>`.
-- `tests/**/*.cs`:
-  1. The test project is the nearest parent folder containing a `.csproj`.
-  2. The source projects are the `<ProjectReference>` items of that `.csproj` that point into `src/`.
-  3. Candidate type names, in order: the file name without the `Tests` or `Test` suffix, then the parent folder names from the nearest to the farthest.
-  4. The first candidate declared as `class`, `record`, `struct` or `interface` in those source projects wins, and the file(s) declaring it become the targets.
-  5. If no candidate matches, every `.cs` file of the referenced source projects is targeted (`**/src/<Project>/**/*.cs`). Slower, but a test change never goes untested.
+- Only added, modified and renamed `.cs` files are considered (`--diff-filter=AMR`). Deleted files have nothing left to mutate.
+- Each file belongs to the **nearest parent folder containing a `.csproj`**. Files outside any project (e.g. a `build.cs` script at the root) are ignored.
+- A project is a **test project** when any of these is true:
+  - its folder name or `.csproj` name has a `Test`/`Tests` segment: `Demo.Domain.Tests`, `Payments.Core.UnitTests`, `Payments.IntegrationTests`, `Payments.Tests.Shared`;
+  - its `.csproj` sets `<IsTestProject>true</IsTestProject>`;
+  - its `.csproj` references `Microsoft.NET.Test.Sdk`.
+
+  Every other project is a **source project**.
+- File in a source project: the file itself becomes the target `**/<path>`.
+- File in a test project:
+  1. The source projects are the `<ProjectReference>` items of the test `.csproj` that are not test projects themselves (shared test helpers are skipped).
+  2. Candidate type names, in order: the file name without the `Tests` or `Test` suffix, then the parent folder names from the nearest to the farthest (inside the test project).
+  3. The first candidate declared as `class`, `record`, `struct` or `interface` in those source projects wins, and the file(s) declaring it become the targets.
+  4. If no candidate matches, every `.cs` file of the referenced source projects is targeted (`**/<Project>/**/*.cs`). Slower, but a test change never goes untested.
 - Everything else is ignored: `.github/`, docs, `.csproj` files (e.g. Dependabot bumps), SQL seed data, etc.
 
 Examples, all verified against this repository:
@@ -253,6 +259,17 @@ Examples, all verified against this repository:
 | `tests/Demo.Api.Tests/IntegrationTestsFactory.cs` | `**/src/Demo.Api/**/*.cs` | no match, whole project |
 | `tests/Demo.Api.Tests/Api.Tests.csproj` | none | not a `.cs` file |
 
+The same rules on a flat layout (verified with a throwaway repository):
+
+| Changed file | Mutation target | Why |
+|---|---|---|
+| `Payments.Core/Services/PaymentService.cs` | `**/Payments.Core/Services/PaymentService.cs` | source project |
+| `Payments.Core.Tests/Services/PaymentServiceTests.cs` | `**/Payments.Core/Services/PaymentService.cs` | type `PaymentService` |
+| `Payments.Worker.Tests/Jobs/ReconcileJobTests.cs` | `**/Payments.Worker/ReconcileJob.cs` | type `ReconcileJob` |
+| `Payments.Core.Tests/Helpers.cs` | `**/Payments.Core/**/*.cs` and `**/Payments.Common/**/*.cs` | no match, every referenced source project |
+| `Payments.Tests.Shared/Fixture.cs` | none | test helper project that references no source project |
+| `build.cs` (repository root, no `.csproj`) | none | not part of a project |
+
 Output for PR #3, as shown in the job summary:
 
 ```text
@@ -266,7 +283,8 @@ Limitations:
 
 - Tests must follow `<Type>Tests.cs`, `<Type>Test.cs`, or live in a folder named after the type. Otherwise the fallback mutates the whole project.
 - Only source projects **directly** referenced by the test project are searched. `Demo.Api.Tests` only references `Demo.Api`, so a change in an integration test never targets Application or Infrastructure. Those are mutated when their own files change, and by the weekly workflow.
-- The script expects the `src/` and `tests/` layout. Adjust the `case` at the bottom of the script for other layouts.
+- A source project with a name segment ending in `Test`/`Tests` (e.g. an A/B testing feature called `Payments.AbTests`) would be classified as a test project. Rename it, or tweak `name_regex` in `is_test_project`.
+- A project at the repository root (`.csproj` next to `.git`) contains every folder below it, so its fallback glob is `**/*.cs`.
 
 
 ## Tool install/restore problem
@@ -338,7 +356,7 @@ Found while setting up this repository with Stryker.NET 5.0.0.
 
 1. Make sure Stryker gives realistic scores on the full solution locally first (see the gotchas above).
 2. Copy [.github/scripts/detect-mutation-targets.sh](.github/scripts/detect-mutation-targets.sh) and add `*.sh text eol=lf` to `.gitattributes`. Otherwise Windows checkouts with `core.autocrlf=true` get CRLF line endings and the script fails under Git Bash.
-3. If the layout isn't `src/` + `tests/`, adjust the `case` at the bottom of the script.
+3. Check that test projects are recognized: a `Test`/`Tests` name segment, `<IsTestProject>true</IsTestProject>` or a `Microsoft.NET.Test.Sdk` reference. No folder layout is required.
 4. Check the test naming convention (`<Type>Tests.cs`, `<Type>Test.cs`, or a folder named after the type). Run the script on a few branches and review the reasons it prints.
 5. In the PR workflow: checkout with `fetch-depth: 0`, fetch the base branch, run the script, and guard every Stryker-related step with `steps.changes.outputs.has_changes == 'true'`.
 6. Keep a scheduled full run (weekly) for the complete report.
