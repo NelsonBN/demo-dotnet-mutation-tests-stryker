@@ -22,6 +22,9 @@ public sealed class Product
         Quantity = quantity;
     }
 
+    public bool IsLowStock(uint threshold)
+        => Quantity < threshold;
+
     public static Product Create(string? name, uint quantity)
     {
         if(string.IsNullOrWhiteSpace(name))
