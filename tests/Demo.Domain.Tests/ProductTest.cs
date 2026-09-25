@@ -109,4 +109,30 @@ public sealed class ProductTest
         // Assert
         act.Should().BeFalse();
     }
+
+    [Fact]
+    public void When_Restock_Is_Called_Then_It_Should_Increase_The_Quantity()
+    {
+        // Arrange
+        var product = Product.Create("Product Name", 10);
+
+        // Act
+        product.Restock(5);
+
+        // Assert
+        product.Quantity.Should().Be(15u);
+    }
+
+    [Fact]
+    public void When_Restock_Is_Called_With_Zero_Amount_Then_It_Should_Throw_InvalidException()
+    {
+        // Arrange
+        var product = Product.Create("Product Name", 10);
+
+        // Act
+        var act = () => product.Restock(0);
+
+        // Assert
+        act.Should().Throw<InvalidException>();
+    }
 }
