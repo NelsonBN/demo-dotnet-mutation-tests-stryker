@@ -43,6 +43,21 @@ jobs:
       run: |
         git fetch origin +${{ github.event.pull_request.base.ref }}:refs/remotes/origin/${{ github.event.pull_request.base.ref }}
 
+    # Stryker's --since is not used: in --solution mode it treats every changed file as a test file (see README)
+    - name: "Detect mutation targets"
+      id: changes
+      shell: bash
+      env:
+        BASE_REF: ${{ github.event.pull_request.base.ref }}
+        MUTATE_FILE: ${{ runner.temp }}/mutate-files.txt
+      run: |
+        bash .github/scripts/detect-mutation-targets.sh "origin/$BASE_REF" "$MUTATE_FILE" | tee -a "$GITHUB_STEP_SUMMARY"
+        if [[ -s "$MUTATE_FILE" ]]; then
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "has_changes=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: "Define branch name for Stryker"
       env:
         GH_HEAD_REF: ${{ github.head_ref }}
@@ -97,10 +112,20 @@ jobs:
         dotnet tool update dotnet-coverage --tool-path ./.sonar/scanner
 
     - name: "Run Stryker (changed code only)"
+      # Never run without targets: no --mutate means Stryker mutates the whole solution
+      if: steps.changes.outputs.has_changes == 'true'
+      shell: bash
+      env:
+        MUTATE_FILE: ${{ runner.temp }}/mutate-files.txt
       run: |
+        mutate_args=()
+        while IFS= read -r glob; do
+          mutate_args+=(--mutate "$glob")
+        done < "$MUTATE_FILE"
+
         dotnet stryker \
           --solution ${{ env.SOLUTION_FILE }} \
-          --since:origin/${{ github.event.pull_request.base.ref }} \
+          "${mutate_args[@]}" \
           --reporter json \
           --reporter cleartext \
           --reporter markdown \
@@ -108,9 +133,11 @@ jobs:
           -O ${{ github.workspace }}/mutations
 
     - name: "Convert report to Sonar"
+      if: steps.changes.outputs.has_changes == 'true'
       run: jq -f tests/mutation-report-to-sonar.jq '${{ github.workspace }}/mutations/reports/mutation-report.json' > '${{ github.workspace }}/mutations/reports/mutation-sonar.json'
 
     # - name: "Add Stryker Report in PR Comment"
+    #   if: steps.changes.outputs.has_changes == 'true'
     #   uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88
     #   with:
     #     header: stryker-report
@@ -122,14 +149,24 @@ jobs:
     #       To more details: https://dashboard.stryker-mutator.io/reports/github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ env.STRYKER_BRANCH }}
 
     - name: "Publish report"
-      run: cat $(find ${{ github.workspace }}/mutations/reports/* -name "*.md") > $GITHUB_STEP_SUMMARY
+      if: steps.changes.outputs.has_changes == 'true'
+      run: cat $(find ${{ github.workspace }}/mutations/reports/* -name "*.md") >> $GITHUB_STEP_SUMMARY
+
+    - name: "Skip mutation tests"
+      if: steps.changes.outputs.has_changes != 'true'
+      run: echo "Mutation tests skipped - no changed source or test code." >> $GITHUB_STEP_SUMMARY
 
     # - name: "Build and analyze"
     #   env:
     #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
     #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     #     SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+    #     HAS_MUTATIONS: ${{ steps.changes.outputs.has_changes }}
     #   run: |
+    #     sonar_args=()
+    #     if [[ "$HAS_MUTATIONS" == "true" ]]; then
+    #       sonar_args+=(/d:sonar.externalIssuesReportPaths="${{ github.workspace }}/mutations/reports/mutation-sonar.json")
+    #     fi
     #     ./.sonar/scanner/dotnet-sonarscanner begin \
     #       /k:"$SONAR_PROJECT_KEY" \
     #       /o:"${{ env.SONAR_ORGANIZATION }}" \
@@ -143,7 +180,7 @@ jobs:
     #       /d:sonar.cs.analyzeGeneratedCode=false \
     #       /d:sonar.cs.file.suffixes=.cs \
     #       /d:sonar.githubactions.activate=true \
-    #       /d:sonar.externalIssuesReportPaths="${{ github.workspace }}/mutations/reports/mutation-sonar.json" \
+    #       "${sonar_args[@]}" \
     #       /d:sonar.pullrequest.key="${{ github.event.pull_request.number }}" \
     #       /d:sonar.pullrequest.branch="${{ github.head_ref }}" \
     #       /d:sonar.pullrequest.base="${{ github.event.pull_request.base.ref }}"
