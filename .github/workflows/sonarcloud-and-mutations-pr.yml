@@ -97,8 +97,6 @@ jobs:
         dotnet tool update dotnet-coverage --tool-path ./.sonar/scanner
 
     - name: "Run Stryker (changed code only)"
-      env:
-        STRYKER_API_KEY: ${{ secrets.STRYKER_API_KEY }}
       run: |
         dotnet stryker \
           --solution ${{ env.SOLUTION_FILE }} \
@@ -106,50 +104,49 @@ jobs:
           --reporter json \
           --reporter cleartext \
           --reporter markdown \
-          --reporter dashboard --dashboard-api-key $STRYKER_API_KEY \
           --version ${{ env.STRYKER_BRANCH }} \
           -O ${{ github.workspace }}/mutations
 
     - name: "Convert report to Sonar"
       run: jq -f tests/mutation-report-to-sonar.jq '${{ github.workspace }}/mutations/reports/mutation-report.json' > '${{ github.workspace }}/mutations/reports/mutation-sonar.json'
 
-    - name: "Add Stryker Report in PR Comment"
-      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88
-      with:
-        header: stryker-report
-        hide_and_recreate: true
-        hide_classify: "OUTDATED"
-        message: |
-          🚀 **Stryker report generated (changed code only)** 🚀
-          [![Mutation testing badge](https://img.shields.io/endpoint?style=flat&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2F${{ github.repository_owner }}%2F${{ github.event.repository.name }}%2F${{ env.STRYKER_BRANCH }})](https://dashboard.stryker-mutator.io/reports/github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ env.STRYKER_BRANCH }})
-          To more details: https://dashboard.stryker-mutator.io/reports/github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ env.STRYKER_BRANCH }}
+    # - name: "Add Stryker Report in PR Comment"
+    #   uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88
+    #   with:
+    #     header: stryker-report
+    #     hide_and_recreate: true
+    #     hide_classify: "OUTDATED"
+    #     message: |
+    #       🚀 **Stryker report generated (changed code only)** 🚀
+    #       [![Mutation testing badge](https://img.shields.io/endpoint?style=flat&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2F${{ github.repository_owner }}%2F${{ github.event.repository.name }}%2F${{ env.STRYKER_BRANCH }})](https://dashboard.stryker-mutator.io/reports/github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ env.STRYKER_BRANCH }})
+    #       To more details: https://dashboard.stryker-mutator.io/reports/github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ env.STRYKER_BRANCH }}
 
     - name: "Publish report"
       run: cat $(find ${{ github.workspace }}/mutations/reports/* -name "*.md") > $GITHUB_STEP_SUMMARY
 
-    - name: "Build and analyze"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
-      run: |
-        ./.sonar/scanner/dotnet-sonarscanner begin \
-          /k:"$SONAR_PROJECT_KEY" \
-          /o:"${{ env.SONAR_ORGANIZATION }}" \
-          /d:sonar.token="$SONAR_TOKEN" \
-          /d:sonar.host.url="https://sonarcloud.io" \
-          /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml \
-          /d:sonar.vstest.reportsPaths="**/*.trx" \
-          /d:sonar.projectBaseDir="$(pwd)" \
-          /d:sonar.scanner.scanAll=false \
-          /d:sonar.cs.analyzeRazorCode=false \
-          /d:sonar.cs.analyzeGeneratedCode=false \
-          /d:sonar.cs.file.suffixes=.cs \
-          /d:sonar.githubactions.activate=true \
-          /d:sonar.externalIssuesReportPaths="${{ github.workspace }}/mutations/reports/mutation-sonar.json" \
-          /d:sonar.pullrequest.key="${{ github.event.pull_request.number }}" \
-          /d:sonar.pullrequest.branch="${{ github.head_ref }}" \
-          /d:sonar.pullrequest.base="${{ github.event.pull_request.base.ref }}"
-        dotnet build ${{ env.SOLUTION_FILE }} -c Release --no-incremental
-        ./.sonar/scanner/dotnet-coverage collect "dotnet test ${{ env.SOLUTION_FILE }} -c Release --no-restore --no-build --logger trx" -f xml -o "coverage.xml"
-        ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+    # - name: "Build and analyze"
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
+    #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    #     SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+    #   run: |
+    #     ./.sonar/scanner/dotnet-sonarscanner begin \
+    #       /k:"$SONAR_PROJECT_KEY" \
+    #       /o:"${{ env.SONAR_ORGANIZATION }}" \
+    #       /d:sonar.token="$SONAR_TOKEN" \
+    #       /d:sonar.host.url="https://sonarcloud.io" \
+    #       /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml \
+    #       /d:sonar.vstest.reportsPaths="**/*.trx" \
+    #       /d:sonar.projectBaseDir="$(pwd)" \
+    #       /d:sonar.scanner.scanAll=false \
+    #       /d:sonar.cs.analyzeRazorCode=false \
+    #       /d:sonar.cs.analyzeGeneratedCode=false \
+    #       /d:sonar.cs.file.suffixes=.cs \
+    #       /d:sonar.githubactions.activate=true \
+    #       /d:sonar.externalIssuesReportPaths="${{ github.workspace }}/mutations/reports/mutation-sonar.json" \
+    #       /d:sonar.pullrequest.key="${{ github.event.pull_request.number }}" \
+    #       /d:sonar.pullrequest.branch="${{ github.head_ref }}" \
+    #       /d:sonar.pullrequest.base="${{ github.event.pull_request.base.ref }}"
+    #     dotnet build ${{ env.SOLUTION_FILE }} -c Release --no-incremental
+    #     ./.sonar/scanner/dotnet-coverage collect "dotnet test ${{ env.SOLUTION_FILE }} -c Release --no-restore --no-build --logger trx" -f xml -o "coverage.xml"
+    #     ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
