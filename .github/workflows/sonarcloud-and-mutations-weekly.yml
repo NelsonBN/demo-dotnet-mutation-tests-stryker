@@ -1,0 +1,120 @@
+name: 'SonarCloud and Mutation Tests (Weekly - full solution)'
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: '0 20 * * 0' # Every Sunday at 20:00 UTC
+
+env:
+  SOLUTION_FILE: 'demo-dotnet-mutation-tests-stryker.slnx'
+
+  # Set up the .NET environment to improve test performance and reliability
+  DOTNET_CLI_TELEMETRY_OPTOUT: true # Disable .NET CLI telemetry
+  DOTNET_NOLOGO: true # Disable .NET CLI logo
+  DOTNET_SYSTEM_CONSOLE_ALLOW_ANSI_COLOR_REDIRECTION: true # Enable ANSI color redirection
+  TERM: xterm # Enable ANSI color redirection
+  NUGET_XMLDOC_MODE: skip # Disable NuGet XML documentation generation
+
+  SONAR_ORGANIZATION: 'nelsonbn'
+  STRYKER_BRANCH: 'main'
+
+permissions: {}
+
+jobs:
+  sonar-scanner:
+    name: "Sonar Scanner and Mutation Tests"
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - name: "Checkout"
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+
+    - name: "Setup .NET"
+      uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+      with:
+        global-json-file: 'global.json'
+
+    - name: "Set up JDK"
+      uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: "Restore .NET Tools"
+      run: dotnet tool restore
+
+    - name: "Create cache directory"
+      run: mkdir -p ~/sonar/cache
+
+    - name: "Cache SonarCloud packages"
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      with:
+        path: ~/sonar/cache
+        key: ${{ runner.os }}-sonar-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-sonar-
+          ${{ runner.os }}-
+
+    - name: "Cache SonarCloud scanner"
+      id: cache-sonar-scanner
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      with:
+        path: ./.sonar/scanner
+        key: ${{ runner.os }}-sonar-scanner
+        restore-keys: ${{ runner.os }}-sonar-scanner
+
+    - name: "Install SonarCloud scanner"
+      if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p ./.sonar/scanner
+        dotnet tool update dotnet-sonarscanner --tool-path ./.sonar/scanner
+        dotnet tool update dotnet-coverage --tool-path ./.sonar/scanner
+
+    - name: "Run Stryker (full solution)"
+      env:
+        STRYKER_API_KEY: ${{ secrets.STRYKER_API_KEY }}
+      run: |
+        dotnet stryker \
+          --solution ${{ env.SOLUTION_FILE }} \
+          --reporter json \
+          --reporter cleartext \
+          --reporter markdown \
+          --reporter dashboard --dashboard-api-key $STRYKER_API_KEY \
+          --version ${{ env.STRYKER_BRANCH }} \
+          -O ${{ github.workspace }}/mutations
+
+    - name: "Convert report to Sonar"
+      run: jq -f tests/mutation-report-to-sonar.jq '${{ github.workspace }}/mutations/reports/mutation-report.json' > '${{ github.workspace }}/mutations/reports/mutation-sonar.json'
+
+    - name: "Publish report"
+      run: cat $(find ${{ github.workspace }}/mutations/reports/* -name "*.md") > $GITHUB_STEP_SUMMARY
+
+    - name: "Build and analyze"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+      run: |
+        ./.sonar/scanner/dotnet-sonarscanner begin \
+          /k:"$SONAR_PROJECT_KEY" \
+          /o:"${{ env.SONAR_ORGANIZATION }}" \
+          /d:sonar.token="$SONAR_TOKEN" \
+          /d:sonar.host.url="https://sonarcloud.io" \
+          /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml \
+          /d:sonar.vstest.reportsPaths="**/*.trx" \
+          /d:sonar.projectBaseDir="$(pwd)" \
+          /d:sonar.scanner.scanAll=false \
+          /d:sonar.cs.analyzeRazorCode=false \
+          /d:sonar.cs.analyzeGeneratedCode=false \
+          /d:sonar.cs.file.suffixes=.cs \
+          /d:sonar.githubactions.activate=true \
+          /d:sonar.externalIssuesReportPaths="${{ github.workspace }}/mutations/reports/mutation-sonar.json"
+        dotnet build ${{ env.SOLUTION_FILE }} -c Release --no-incremental
+        ./.sonar/scanner/dotnet-coverage collect "dotnet test ${{ env.SOLUTION_FILE }} -c Release --no-restore --no-build --logger trx" -f xml -o "coverage.xml"
+        ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"

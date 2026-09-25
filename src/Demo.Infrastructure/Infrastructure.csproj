@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+
+    <RootNamespace>Demo.Infrastructure</RootNamespace>
+    <AssemblyName>Demo.Infrastructure</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.89" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
+    <PackageReference Include="MySql.Data" Version="26.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Demo.Application\Application.csproj" />
+    <ProjectReference Include="..\Demo.Domain\Domain.csproj" />
+  </ItemGroup>
+
+</Project>

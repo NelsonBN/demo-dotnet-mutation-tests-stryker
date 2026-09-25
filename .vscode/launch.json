@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Api",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/Demo.Api/bin/Debug/net10.0/Demo.Api.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/Demo.Api",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    }
+  ]
+}

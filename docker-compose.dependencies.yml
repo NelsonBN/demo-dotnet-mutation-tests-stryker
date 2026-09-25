@@ -1,0 +1,23 @@
+networks:
+  demo:
+    driver: bridge
+
+services:
+  mysql:
+    image: mysql:9.7.2
+    container_name: mysql
+    restart: always
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: a123456789
+      MYSQL_DATABASE: demo
+    volumes:
+      - ./tests/db-init.sql:/docker-entrypoint-initdb.d/db-init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+    networks:
+      - demo

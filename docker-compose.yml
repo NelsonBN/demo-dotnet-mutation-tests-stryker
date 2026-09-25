@@ -1,0 +1,25 @@
+networks:
+  demo:
+    driver: bridge
+
+services:
+  mysql:
+    extends:
+      file: docker-compose.dependencies.yml
+      service: mysql
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: technobre/demo-api
+    container_name: demo-api
+    environment:
+      - ConnectionStrings__Default=server=mysql;Port=3306;database=demo;uid=root;password=a123456789;pooling=true;
+    ports:
+      - "8080:8080"
+    networks:
+      - demo
+    depends_on:
+      mysql:
+        condition: service_healthy
