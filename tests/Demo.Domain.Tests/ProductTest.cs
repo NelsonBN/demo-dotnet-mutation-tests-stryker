@@ -70,4 +70,43 @@ public sealed class ProductTest
         product.Name.Should().Be(name);
         product.Quantity.Should().Be(quantity);
     }
+
+    [Fact]
+    public void When_Quantity_Is_Below_Threshold_Then_IsLowStock_Should_Return_True()
+    {
+        // Arrange
+        var product = Product.Create("Product Name", 5);
+
+        // Act
+        var act = product.IsLowStock(10);
+
+        // Assert
+        act.Should().BeTrue();
+    }
+
+    [Fact]
+    public void When_Quantity_Is_Equal_To_Threshold_Then_IsLowStock_Should_Return_False()
+    {
+        // Arrange
+        var product = Product.Create("Product Name", 10);
+
+        // Act
+        var act = product.IsLowStock(10);
+
+        // Assert
+        act.Should().BeFalse();
+    }
+
+    [Fact]
+    public void When_Quantity_Is_Above_Threshold_Then_IsLowStock_Should_Return_False()
+    {
+        // Arrange
+        var product = Product.Create("Product Name", 15);
+
+        // Act
+        var act = product.IsLowStock(10);
+
+        // Assert
+        act.Should().BeFalse();
+    }
 }
