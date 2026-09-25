@@ -12,5 +12,6 @@ public static class Setup
                    .AddTransient<GetProductsUseCase>()
                    .AddTransient<GetProductUseCase>()
                    .AddTransient<GetLowStockProductsUseCase>()
+                   .AddTransient<RestockProductUseCase>()
                    .AddTransient<UpdateProductUseCase>();
 }

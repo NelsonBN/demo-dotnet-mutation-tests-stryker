@@ -98,5 +98,23 @@ public static class ProductsEndpoints
                 return Results.NotFound();
             }
         });
+
+
+        endpoints.MapPost("/products/{id:guid}/restock", async (RestockProductUseCase userCase, Guid id, uint amount, CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var product = await userCase.ExecuteAsync(id, amount, cancellationToken);
+                return Results.Ok(product);
+            }
+            catch (NotFoundException)
+            {
+                return Results.NotFound();
+            }
+            catch (InvalidException)
+            {
+                return Results.BadRequest();
+            }
+        });
     }
 }

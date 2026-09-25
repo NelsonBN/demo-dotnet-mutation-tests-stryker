@@ -25,6 +25,16 @@ public sealed class Product
     public bool IsLowStock(uint threshold)
         => Quantity < threshold;
 
+    public void Restock(uint amount)
+    {
+        if(amount == 0)
+        {
+            throw new InvalidException("Amount must be greater than zero");
+        }
+
+        Quantity += amount;
+    }
+
     public static Product Create(string? name, uint quantity)
     {
         if(string.IsNullOrWhiteSpace(name))
