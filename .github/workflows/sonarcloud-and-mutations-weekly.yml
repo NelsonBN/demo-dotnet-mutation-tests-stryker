@@ -84,6 +84,7 @@ jobs:
           --reporter json \
           --reporter cleartext \
           --reporter markdown \
+          --reporter html \
           --version ${{ env.STRYKER_BRANCH }} \
           -O ${{ github.workspace }}/mutations
 
