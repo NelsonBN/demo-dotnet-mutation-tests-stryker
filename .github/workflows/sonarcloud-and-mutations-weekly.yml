@@ -93,6 +93,13 @@ jobs:
     - name: "Publish report"
       run: cat $(find ${{ github.workspace }}/mutations/reports/* -name "*.md") > $GITHUB_STEP_SUMMARY
 
+    - name: "Upload Html report as artifact"
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        retention-days: 7
+        name: mutation-tests-report
+        path: ${{ github.workspace }}/mutations/reports/mutation-report.html
+
     - name: "Build and analyze"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
