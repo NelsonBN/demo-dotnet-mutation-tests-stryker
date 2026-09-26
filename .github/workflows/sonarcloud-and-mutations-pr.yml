@@ -164,11 +164,12 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
-        HAS_MUTATIONS: ${{ steps.changes.outputs.has_changes }}
+        MUTATION_SONAR_REPORT: ${{ github.workspace }}/mutations/reports/mutation-sonar.json
       run: |
         sonar_args=()
-        if [[ "$HAS_MUTATIONS" == "true" ]]; then
-          sonar_args+=(/d:sonar.externalIssuesReportPaths="${{ github.workspace }}/mutations/reports/mutation-sonar.json")
+        # Check the file itself, not just has_changes: earlier steps may have failed/skipped despite it being 'true'
+        if [[ -f "$MUTATION_SONAR_REPORT" ]]; then
+          sonar_args+=(/d:sonar.externalIssuesReportPaths="$MUTATION_SONAR_REPORT")
         fi
         ./.sonar/scanner/dotnet-sonarscanner begin \
           /k:"$SONAR_PROJECT_KEY" \
