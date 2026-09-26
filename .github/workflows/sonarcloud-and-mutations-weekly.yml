@@ -92,26 +92,26 @@ jobs:
     - name: "Publish report"
       run: cat $(find ${{ github.workspace }}/mutations/reports/* -name "*.md") > $GITHUB_STEP_SUMMARY
 
-    # - name: "Build and analyze"
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-    #     SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
-    #   run: |
-    #     ./.sonar/scanner/dotnet-sonarscanner begin \
-    #       /k:"$SONAR_PROJECT_KEY" \
-    #       /o:"${{ env.SONAR_ORGANIZATION }}" \
-    #       /d:sonar.token="$SONAR_TOKEN" \
-    #       /d:sonar.host.url="https://sonarcloud.io" \
-    #       /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml \
-    #       /d:sonar.vstest.reportsPaths="**/*.trx" \
-    #       /d:sonar.projectBaseDir="$(pwd)" \
-    #       /d:sonar.scanner.scanAll=false \
-    #       /d:sonar.cs.analyzeRazorCode=false \
-    #       /d:sonar.cs.analyzeGeneratedCode=false \
-    #       /d:sonar.cs.file.suffixes=.cs \
-    #       /d:sonar.githubactions.activate=true \
-    #       /d:sonar.externalIssuesReportPaths="${{ github.workspace }}/mutations/reports/mutation-sonar.json"
-    #     dotnet build ${{ env.SOLUTION_FILE }} -c Release --no-incremental
-    #     ./.sonar/scanner/dotnet-coverage collect "dotnet test ${{ env.SOLUTION_FILE }} -c Release --no-restore --no-build --logger trx" -f xml -o "coverage.xml"
-    #     ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+    - name: "Build and analyze"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+      run: |
+        ./.sonar/scanner/dotnet-sonarscanner begin \
+          /k:"$SONAR_PROJECT_KEY" \
+          /o:"${{ env.SONAR_ORGANIZATION }}" \
+          /d:sonar.token="$SONAR_TOKEN" \
+          /d:sonar.host.url="https://sonarcloud.io" \
+          /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml \
+          /d:sonar.vstest.reportsPaths="**/*.trx" \
+          /d:sonar.projectBaseDir="$(pwd)" \
+          /d:sonar.scanner.scanAll=false \
+          /d:sonar.cs.analyzeRazorCode=false \
+          /d:sonar.cs.analyzeGeneratedCode=false \
+          /d:sonar.cs.file.suffixes=.cs \
+          /d:sonar.githubactions.activate=true \
+          /d:sonar.externalIssuesReportPaths="${{ github.workspace }}/mutations/reports/mutation-sonar.json"
+        dotnet build ${{ env.SOLUTION_FILE }} -c Release --no-incremental
+        ./.sonar/scanner/dotnet-coverage collect "dotnet test ${{ env.SOLUTION_FILE }} -c Release --no-restore --no-build --logger trx" -f xml -o "coverage.xml"
+        ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
