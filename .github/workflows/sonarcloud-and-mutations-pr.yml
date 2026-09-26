@@ -136,54 +136,57 @@ jobs:
       if: steps.changes.outputs.has_changes == 'true'
       run: jq -f tests/mutation-report-to-sonar.jq '${{ github.workspace }}/mutations/reports/mutation-report.json' > '${{ github.workspace }}/mutations/reports/mutation-sonar.json'
 
-    # - name: "Add Stryker Report in PR Comment"
-    #   if: steps.changes.outputs.has_changes == 'true'
-    #   uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88
-    #   with:
-    #     header: stryker-report
-    #     hide_and_recreate: true
-    #     hide_classify: "OUTDATED"
-    #     message: |
-    #       🚀 **Stryker report generated (changed code only)** 🚀
-    #       [![Mutation testing badge](https://img.shields.io/endpoint?style=flat&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2F${{ github.repository_owner }}%2F${{ github.event.repository.name }}%2F${{ env.STRYKER_BRANCH }})](https://dashboard.stryker-mutator.io/reports/github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ env.STRYKER_BRANCH }})
-    #       To more details: https://dashboard.stryker-mutator.io/reports/github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ env.STRYKER_BRANCH }}
+    - name: "Locate mutation report"
+      if: steps.changes.outputs.has_changes == 'true'
+      id: locate-report
+      shell: bash
+      run: echo "path=$(find ${{ github.workspace }}/mutations/reports/* -name "*.md")" >> "$GITHUB_OUTPUT"
 
     - name: "Publish report"
       if: steps.changes.outputs.has_changes == 'true'
-      run: cat $(find ${{ github.workspace }}/mutations/reports/* -name "*.md") >> $GITHUB_STEP_SUMMARY
+      run: cat "${{ steps.locate-report.outputs.path }}" >> $GITHUB_STEP_SUMMARY
+
+    - name: "Add Stryker Report in PR Comment"
+      if: steps.changes.outputs.has_changes == 'true'
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88
+      with:
+        header: stryker-report
+        hide_and_recreate: true
+        hide_classify: "OUTDATED"
+        path: ${{ steps.locate-report.outputs.path }}
 
     - name: "Skip mutation tests"
       if: steps.changes.outputs.has_changes != 'true'
       run: echo "Mutation tests skipped - no changed source or test code." >> $GITHUB_STEP_SUMMARY
 
-    # - name: "Build and analyze"
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
-    #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-    #     SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
-    #     HAS_MUTATIONS: ${{ steps.changes.outputs.has_changes }}
-    #   run: |
-    #     sonar_args=()
-    #     if [[ "$HAS_MUTATIONS" == "true" ]]; then
-    #       sonar_args+=(/d:sonar.externalIssuesReportPaths="${{ github.workspace }}/mutations/reports/mutation-sonar.json")
-    #     fi
-    #     ./.sonar/scanner/dotnet-sonarscanner begin \
-    #       /k:"$SONAR_PROJECT_KEY" \
-    #       /o:"${{ env.SONAR_ORGANIZATION }}" \
-    #       /d:sonar.token="$SONAR_TOKEN" \
-    #       /d:sonar.host.url="https://sonarcloud.io" \
-    #       /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml \
-    #       /d:sonar.vstest.reportsPaths="**/*.trx" \
-    #       /d:sonar.projectBaseDir="$(pwd)" \
-    #       /d:sonar.scanner.scanAll=false \
-    #       /d:sonar.cs.analyzeRazorCode=false \
-    #       /d:sonar.cs.analyzeGeneratedCode=false \
-    #       /d:sonar.cs.file.suffixes=.cs \
-    #       /d:sonar.githubactions.activate=true \
-    #       "${sonar_args[@]}" \
-    #       /d:sonar.pullrequest.key="${{ github.event.pull_request.number }}" \
-    #       /d:sonar.pullrequest.branch="${{ github.head_ref }}" \
-    #       /d:sonar.pullrequest.base="${{ github.event.pull_request.base.ref }}"
-    #     dotnet build ${{ env.SOLUTION_FILE }} -c Release --no-incremental
-    #     ./.sonar/scanner/dotnet-coverage collect "dotnet test ${{ env.SOLUTION_FILE }} -c Release --no-restore --no-build --logger trx" -f xml -o "coverage.xml"
-    #     ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+    - name: "Build and analyze"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+        HAS_MUTATIONS: ${{ steps.changes.outputs.has_changes }}
+      run: |
+        sonar_args=()
+        if [[ "$HAS_MUTATIONS" == "true" ]]; then
+          sonar_args+=(/d:sonar.externalIssuesReportPaths="${{ github.workspace }}/mutations/reports/mutation-sonar.json")
+        fi
+        ./.sonar/scanner/dotnet-sonarscanner begin \
+          /k:"$SONAR_PROJECT_KEY" \
+          /o:"${{ env.SONAR_ORGANIZATION }}" \
+          /d:sonar.token="$SONAR_TOKEN" \
+          /d:sonar.host.url="https://sonarcloud.io" \
+          /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml \
+          /d:sonar.vstest.reportsPaths="**/*.trx" \
+          /d:sonar.projectBaseDir="$(pwd)" \
+          /d:sonar.scanner.scanAll=false \
+          /d:sonar.cs.analyzeRazorCode=false \
+          /d:sonar.cs.analyzeGeneratedCode=false \
+          /d:sonar.cs.file.suffixes=.cs \
+          /d:sonar.githubactions.activate=true \
+          "${sonar_args[@]}" \
+          /d:sonar.pullrequest.key="${{ github.event.pull_request.number }}" \
+          /d:sonar.pullrequest.branch="${{ github.head_ref }}" \
+          /d:sonar.pullrequest.base="${{ github.event.pull_request.base.ref }}"
+        dotnet build ${{ env.SOLUTION_FILE }} -c Release --no-incremental
+        ./.sonar/scanner/dotnet-coverage collect "dotnet test ${{ env.SOLUTION_FILE }} -c Release --no-restore --no-build --logger trx" -f xml -o "coverage.xml"
+        ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
