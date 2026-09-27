@@ -148,7 +148,7 @@ jobs:
       if: steps.changes.outputs.has_changes == 'true'
       run: cat "${{ steps.locate-report.outputs.path }}" >> $GITHUB_STEP_SUMMARY
 
-    - name: "Add Stryker Report in PR Comment"
+    - name: "Add Stryker Report in PR Comment (Report)"
       if: steps.changes.outputs.has_changes == 'true'
       uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88
       with:
@@ -156,6 +156,16 @@ jobs:
         hide_and_recreate: true
         hide_classify: "OUTDATED"
         path: ${{ steps.locate-report.outputs.path }}
+
+    - name: "Add Stryker Report in PR Comment (Skipped)"
+      if: steps.changes.outputs.has_changes != 'true'
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88
+      with:
+        header: stryker-report
+        hide_and_recreate: true
+        hide_classify: "OUTDATED"
+        message: |
+          Mutation tests skipped - no changed source or test code.
 
     - name: "Upload Html report as artifact"
       if: steps.changes.outputs.has_changes == 'true'
