@@ -22,17 +22,19 @@ declare -a target_order=()
 declare -A target_reasons=()
 
 add_target() { # $1 = glob, $2 = reason
-  if [[ -z "${target_reasons[$1]+x}" ]]; then
-    target_order+=("$1")
-    target_reasons["$1"]="$2"
+  local glob="$1" reason="$2"
+  if [[ -z "${target_reasons[$glob]+x}" ]]; then
+    target_order+=("$glob")
+    target_reasons["$glob"]="$reason"
   else
-    target_reasons["$1"]+="; $2"
+    target_reasons["$glob"]+="; $reason"
   fi
 }
 
 find_project_dir() { # $1 = repo-relative file path -> nearest ancestor directory containing a *.csproj ("." = repo root)
+  local file="$1"
   local dir
-  dir="$(dirname "$1")"
+  dir="$(dirname "$file")"
   while true; do
     if compgen -G "$dir/*.csproj" > /dev/null; then
       echo "$dir"
@@ -46,11 +48,12 @@ find_project_dir() { # $1 = repo-relative file path -> nearest ancestor director
 }
 
 is_test_project() { # $1 = project dir
+  local project_dir="$1"
   local csproj name_regex='(^|\.)[A-Za-z0-9]*Tests?(\.|$)'
-  if [[ "$(basename "$(realpath -m "$1")")" =~ $name_regex ]]; then
+  if [[ "$(basename "$(realpath -m "$project_dir")")" =~ $name_regex ]]; then
     return 0
   fi
-  for csproj in "$1"/*.csproj; do
+  for csproj in "$project_dir"/*.csproj; do
     [[ -f "$csproj" ]] || continue
     if [[ "$(basename "$csproj" .csproj)" =~ $name_regex ]] \
       || grep -qiE '<IsTestProject>[[:space:]]*true[[:space:]]*</IsTestProject>|Include="Microsoft\.NET\.Test\.Sdk"' "$csproj"; then
@@ -61,22 +64,24 @@ is_test_project() { # $1 = project dir
 }
 
 project_glob() { # $1 = project dir -> glob matching all its .cs files
-  if [[ "$1" == "." ]]; then
+  local project_dir="$1"
+  if [[ "$project_dir" == "." ]]; then
     echo "**/*.cs"
   else
-    echo "**/$1/**/*.cs"
+    echo "**/$project_dir/**/*.cs"
   fi
 }
 
 referenced_projects() { # $1 = project dir -> repo-relative dirs of the projects in its <ProjectReference> items
+  local project_dir="$1"
   local csproj ref
-  for csproj in "$1"/*.csproj; do
+  for csproj in "$project_dir"/*.csproj; do
     [[ -f "$csproj" ]] || continue
     grep -oE '<ProjectReference[^>]*Include="[^"]+"' "$csproj" \
       | sed -E 's/.*Include="([^"]+)"/\1/' \
       | tr '\\' '/' \
       | while IFS= read -r ref; do
-          dirname "$(realpath -m --relative-to=. "$1/$ref")"
+          dirname "$(realpath -m --relative-to=. "$project_dir/$ref")"
         done
   done | grep -v '^\.\./' | sort -u || true
 }
@@ -84,9 +89,10 @@ referenced_projects() { # $1 = project dir -> repo-relative dirs of the projects
 find_type_declarations() { # $1 = type name, rest = dirs to search
   local name="$1"
   shift
+  local -a dirs=("$@")
   [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 0
   grep -rlE --include='*.cs' --exclude-dir=bin --exclude-dir=obj \
-    "\b(class|record|struct|interface)[[:space:]]+${name}\b" "$@" | sed 's|^\./||' | sort || true
+    "\b(class|record|struct|interface)[[:space:]]+${name}\b" "${dirs[@]}" | sed 's|^\./||' | sort || true
 }
 
 map_test_file() { # $1 = changed test file, $2 = its test project dir
