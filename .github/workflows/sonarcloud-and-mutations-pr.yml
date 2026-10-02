@@ -17,7 +17,7 @@ env:
   NUGET_XMLDOC_MODE: skip # Disable NuGet XML documentation generation
 
   SONAR_ORGANIZATION: 'nelsonbn'
-  SONAR_PROJECT_KEY: 'demo-dotnet-mutation-tests-stryker'
+  SONAR_PROJECT_KEY: 'NelsonBN_demo-dotnet-mutation-tests-stryker'
 
 permissions: {}
 
