@@ -169,7 +169,7 @@ jobs:
 
     - name: "Upload Html report as artifact"
       if: steps.changes.outputs.has_changes == 'true'
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v7.0.1
       with:
         retention-days: 7
         name: mutation-tests-report
