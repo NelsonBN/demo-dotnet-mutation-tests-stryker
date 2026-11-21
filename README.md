@@ -1,5 +1,17 @@
 # Demo .NET Mutation Tests with Stryker
 
+## Goal and requirements
+
+**Goal:** show how to run [Stryker.NET](https://stryker-mutator.io/docs/stryker-net/introduction/) mutation tests in CI/CD: only the differences on each PR (fast), the full solution every week (complete).
+
+| # | Requirement | Status |
+|---|---|---|
+| 1 | Per PR: mutate only the changed code | ✅ PR workflow |
+| 2 | Weekly: full mutation run | ✅ Weekly workflow |
+| 3 | Support solutions with multiple projects | ✅ `.slnx` with 4 source + 3 test projects |
+| 4 | Mutation report with the results | ✅ HTML/JSON reports + SonarCloud |
+| 5 | Document the changes made: all variations tried and the pitfalls found | ✅ see [Decision](#decision-mutate-instead-of-since), [Why --since did not work](#why---since-did-not-work) and [Other Stryker.NET gotchas](#other-strykernet-gotchas) |
+
 Demo of mutation testing with [Stryker.NET](https://stryker-mutator.io/docs/stryker-net/introduction/) on a multi-project .NET 10 solution, with two GitHub Actions workflows:
 
 - **Pull requests**: mutation tests only for the code changed in the PR (fast feedback).
@@ -8,35 +20,6 @@ Demo of mutation testing with [Stryker.NET](https://stryker-mutator.io/docs/stry
 Both workflows are prepared to publish the results to SonarCloud.
 
 This README also documents **why the PR workflow does not use Stryker's built-in `--since` option**, what went wrong with it, and other pitfalls found while setting this up, so the same approach can be reused in other projects.
-
-## Table of contents
-
-- [Table of contents](#table-of-contents)
-- [Solution structure](#solution-structure)
-- [Running mutation tests locally](#running-mutation-tests-locally)
-- [CI workflows](#ci-workflows)
-  - [SonarCloud integration](#sonarcloud-integration)
-- [Decision: --mutate instead of --since](#decision---mutate-instead-of---since)
-  - [Context](#context)
-  - [Decision](#decision)
-  - [Why](#why)
-  - [Consequences](#consequences)
-- [Why --since did not work](#why---since-did-not-work)
-  - [How --since works internally](#how---since-works-internally)
-  - [Problem 1: solution mode classifies every file as a test file](#problem-1-solution-mode-classifies-every-file-as-a-test-file)
-  - [Problem 2: the diff includes untracked files in the workspace](#problem-2-the-diff-includes-untracked-files-in-the-workspace)
-  - [Problem 3: by design, a changed test re-tests everything it covers](#problem-3-by-design-a-changed-test-re-tests-everything-it-covers)
-  - [Evidence from PR #3](#evidence-from-pr-3)
-- [--since vs --mutate](#--since-vs---mutate)
-- [How mutation targets are detected](#how-mutation-targets-are-detected)
-- [Tool install/restore problem](#tool-installrestore-problem)
-  - [The problem](#the-problem)
-  - [Potential fixes](#potential-fixes)
-  - [Why it is not a problem with the current approach](#why-it-is-not-a-problem-with-the-current-approach)
-- [Other Stryker.NET gotchas](#other-strykernet-gotchas)
-- [Checklist: applying this to another project](#checklist-applying-this-to-another-project)
-- [Troubleshooting](#troubleshooting)
-- [References](#references)
 
 
 ## Solution structure
